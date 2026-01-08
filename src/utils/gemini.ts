@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { TweetData, CommentTone, CommentLength, TokenCost, GenerationResult, PersonaData } from '../types';
+import { TweetData, CommentTone, CommentLength, CommentStance, TokenCost, GenerationResult, PersonaData } from '../types';
 
 // Current model - Gemini 3 Pro for higher quality comment generation
 const MODEL_NAME = 'gemini-3-pro-preview';
@@ -28,6 +28,28 @@ const LENGTH_INSTRUCTIONS: Record<CommentLength, string> = {
   short: '1 sentence, under 15 words. Punchy.',
   medium: '1-2 sentences. Makes a point with minimal setup.',
   long: '2-3 sentences. Develops a thought fully.'
+};
+
+const STANCE_INSTRUCTIONS: Record<CommentStance, string> = {
+  agree: `You AGREE with this tweet. Build on their point by:
+- Adding your own experience or example that supports their view
+- Extending their argument with a related insight
+- Validating their point with a specific detail`,
+
+  disagree: `You DISAGREE with this tweet. Respectfully challenge by:
+- Offering a different perspective with reasoning
+- Pointing out a nuance they may have missed
+- Sharing a counterexample from experience`,
+
+  question: `You're GENUINELY CURIOUS about this tweet. Engage by:
+- Asking a specific clarifying question
+- Requesting elaboration on an interesting point
+- Wondering about a related aspect`,
+
+  neutral: `You're NEUTRAL on this tweet. Participate by:
+- Sharing a related observation without judgment
+- Mentioning a similar pattern you've noticed
+- Adding context without taking sides`
 };
 
 // Calculate cost based on token usage
@@ -95,7 +117,8 @@ export async function generateComment(
   tone: CommentTone,
   apiKey: string,
   persona?: PersonaData | null,
-  length: CommentLength = 'medium'
+  length: CommentLength = 'medium',
+  stance: CommentStance = 'neutral'
 ): Promise<GenerationResult> {
   if (!apiKey) {
     throw new Error('API key is not configured.');
@@ -129,14 +152,11 @@ ${tweetData.text}
 </tweet>
 </context>
 ${personaSection}
-<stance-guidance>
-Before writing, decide your position on the tweet:
-- AGREE: Build on their point with your own angle
-- DISAGREE: Respectfully challenge with a different perspective
-- NEUTRAL: Ask a question or share a related observation
+<stance>
+${STANCE_INSTRUCTIONS[stance]}
 
-You do NOT need to acknowledge agreement/disagreement explicitly. Just respond naturally from your chosen stance.
-</stance-guidance>
+Express your stance naturally through your response. Do NOT explicitly say "I agree" or "I disagree".
+</stance>
 
 <reply-style>
 Tone: ${TONE_INSTRUCTIONS[tone]}

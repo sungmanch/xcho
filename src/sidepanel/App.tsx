@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { TweetData, CommentTone, CommentLength, MessagePayload, TokenUsage, TokenCost, PersonaData } from '../types';
+import { TweetData, CommentTone, CommentLength, CommentStance, MessagePayload, TokenUsage, TokenCost, PersonaData } from '../types';
 import { storage } from '../utils/storage';
 import { generateComment } from '../utils/gemini';
 import { analyzeWritings, savePersona, loadPersona, saveRawWritings, clearPersona } from '../utils/persona';
@@ -17,11 +17,19 @@ const LENGTH_LABELS: Record<CommentLength, string> = {
   long: 'Long'
 };
 
+const STANCE_LABELS: Record<CommentStance, string> = {
+  agree: 'Agree',
+  disagree: 'Disagree',
+  question: 'Question',
+  neutral: 'Neutral'
+};
+
 function App() {
   const [apiKey, setApiKey] = useState('');
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [selectedTone, setSelectedTone] = useState<CommentTone>('friendly');
   const [selectedLength, setSelectedLength] = useState<CommentLength>('medium');
+  const [selectedStance, setSelectedStance] = useState<CommentStance>('neutral');
   const [tweetData, setTweetData] = useState<TweetData | null>(null);
   const [generatedComment, setGeneratedComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +50,7 @@ function App() {
       const savedApiKey = await storage.get('apiKey');
       const savedTone = await storage.get('preferredTone');
       const savedLength = await storage.get('preferredLength');
+      const savedStance = await storage.get('preferredStance');
       const savedPersona = await loadPersona();
 
       if (savedApiKey) {
@@ -52,6 +61,9 @@ function App() {
       }
       if (savedLength) {
         setSelectedLength(savedLength);
+      }
+      if (savedStance) {
+        setSelectedStance(savedStance);
       }
       if (savedPersona) {
         setPersona(savedPersona);
@@ -143,7 +155,7 @@ function App() {
     setSuccess('');
 
     try {
-      const result = await generateComment(tweetData, selectedTone, apiKey, persona, selectedLength);
+      const result = await generateComment(tweetData, selectedTone, apiKey, persona, selectedLength, selectedStance);
       setGeneratedComment(result.comment);
       setTokenUsage(result.usage);
       setTokenCost(result.cost);
@@ -152,6 +164,7 @@ function App() {
       // Save preferences
       await storage.set('preferredTone', selectedTone);
       await storage.set('preferredLength', selectedLength);
+      await storage.set('preferredStance', selectedStance);
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
@@ -279,6 +292,22 @@ function App() {
             </div>
           </div>
 
+          {/* Stance Selection */}
+          <div className="input-group">
+            <label>Select Stance</label>
+            <div className="tone-selector">
+              {(Object.keys(STANCE_LABELS) as CommentStance[]).map((stance) => (
+                <div
+                  key={stance}
+                  className={`tone-option ${selectedStance === stance ? 'selected' : ''}`}
+                  onClick={() => setSelectedStance(stance)}
+                >
+                  {STANCE_LABELS[stance]}
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Length Selection */}
           <div className="input-group">
             <label>Select Length</label>
@@ -295,13 +324,15 @@ function App() {
             </div>
           </div>
 
-          <button
-            className="button button-primary"
-            onClick={handleGenerateComment}
-            disabled={isLoading || !apiKey}
-          >
-            {isLoading ? 'Generating...' : 'Generate Comment'}
-          </button>
+          <div className="generate-action">
+            <button
+              className="button button-primary"
+              onClick={handleGenerateComment}
+              disabled={isLoading || !apiKey}
+            >
+              {isLoading ? 'Generating...' : 'Generate Comment'}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="section">

@@ -3,6 +3,11 @@
   "name": "Xcho",
   "version": "1.0.0",
   "description": "Hyper-personalized reply assistant for X",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "permissions": [
     "sidePanel",
     "storage",
@@ -30,6 +35,11 @@
     "default_path": "sidepanel.html"
   },
   "action": {
-    "default_title": "Open Xcho"
+    "default_title": "Open Xcho",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
   }
 }

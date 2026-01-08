@@ -11,11 +11,13 @@ export interface CommentSuggestion {
 
 export type CommentTone = 'friendly' | 'professional' | 'empathetic' | 'humorous';
 export type CommentLength = 'short' | 'medium' | 'long';
+export type CommentStance = 'agree' | 'disagree' | 'question' | 'neutral';
 
 export interface StorageData {
   apiKey?: string;
   preferredTone?: CommentTone;
   preferredLength?: CommentLength;
+  preferredStance?: CommentStance;
   persona?: PersonaData;
   rawWritings?: string[];
 }

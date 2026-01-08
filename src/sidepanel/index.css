@@ -92,8 +92,8 @@
     --color-bg-elevated: #202327;
 
     --color-text-primary: #e7e9ea;
-    --color-text-secondary: #71767b;
-    --color-text-tertiary: #536471;
+    --color-text-secondary: #a1a1aa;
+    --color-text-tertiary: #71717a;
     --color-text-inverse: #0f1419;
 
     --color-accent: #1d9bf0;
@@ -261,8 +261,8 @@ body {
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-4);
-  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
   transition:
     box-shadow var(--duration-normal) var(--ease-out),
     border-color var(--duration-normal) var(--ease-out);
@@ -286,7 +286,7 @@ body {
    ========================================================================== */
 
 .input-group {
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 .input-group:last-child {
@@ -295,10 +295,12 @@ body {
 
 .input-group label {
   display: block;
-  font-size: 13px;
-  font-weight: 500;
-  margin-bottom: var(--space-2);
-  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .input-group input,
@@ -377,7 +379,7 @@ body {
 
 .button-primary {
   background: var(--gradient-accent);
-  color: var(--color-text-inverse);
+  color: #ffffff;
   box-shadow: var(--shadow-xs);
 }
 
@@ -415,16 +417,28 @@ body {
 }
 
 /* ==========================================================================
+   Generate Action
+   ========================================================================== */
+
+.generate-action {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--space-4);
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ==========================================================================
    Tweet Display
    ========================================================================== */
 
 .tweet-content {
   background: var(--color-bg-secondary);
-  padding: var(--space-4);
+  padding: var(--space-3);
   border-radius: var(--radius-md);
-  margin-bottom: var(--space-4);
-  font-size: 14px;
-  line-height: 1.6;
+  margin-bottom: var(--space-3);
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--color-text-primary);
   border-left: 3px solid var(--color-accent);
   position: relative;
@@ -433,9 +447,9 @@ body {
 .tweet-content::before {
   content: '"';
   position: absolute;
-  top: var(--space-2);
-  left: var(--space-3);
-  font-size: 32px;
+  top: var(--space-1);
+  left: var(--space-2);
+  font-size: 24px;
   font-family: Georgia, serif;
   color: var(--color-accent);
   opacity: 0.15;
@@ -458,60 +472,53 @@ body {
 }
 
 /* ==========================================================================
-   Tone Selector
+   Compact Option Chips - Horizontal pill-style selectors
    ========================================================================== */
 
 .tone-selector {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: var(--space-3);
 }
 
 .tone-option {
-  padding: var(--space-3) var(--space-4);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
+  padding: 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
   background: var(--color-bg-primary);
   cursor: pointer;
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--color-text-secondary);
-  transition:
-    all var(--duration-fast) var(--ease-out);
-  position: relative;
-  overflow: hidden;
-}
-
-.tone-option::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--color-accent);
-  opacity: 0;
-  transition: opacity var(--duration-fast) var(--ease-out);
+  transition: all var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
 }
 
 .tone-option:hover {
   border-color: var(--color-accent);
   color: var(--color-text-primary);
+  background: var(--color-accent-subtle);
 }
 
 .tone-option.selected {
   border-color: var(--color-accent);
-  background: var(--color-accent-subtle);
-  color: var(--color-accent);
+  background: var(--color-accent);
+  color: white;
   font-weight: 600;
 }
 
-.tone-option.selected::after {
-  content: '✓';
-  position: absolute;
-  top: var(--space-1);
-  right: var(--space-2);
-  font-size: 10px;
-  color: var(--color-accent);
+/* Dark mode chip adjustments for better contrast */
+@media (prefers-color-scheme: dark) {
+  .tone-option {
+    color: var(--color-text-primary);
+    border-color: var(--color-border-strong);
+  }
+
+  .tone-option:hover {
+    border-color: var(--color-accent);
+  }
 }
 
 /* ==========================================================================
