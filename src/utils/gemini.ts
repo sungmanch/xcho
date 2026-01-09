@@ -112,13 +112,28 @@ CRITICAL: Match the TONE and MANNER only. Use your own vocabulary. Never copy sp
 </persona-tone>`;
 }
 
+// Build user intent section - handles Korean/English input for comment direction
+function buildUserIntentSection(userIntent: string | undefined): string {
+  if (!userIntent || userIntent.trim() === '') return '';
+
+  return `
+<user-intent>
+The user wants this specific approach for their reply:
+"${userIntent.trim()}"
+
+Incorporate this intent naturally into the reply while maintaining the selected tone and stance.
+If the intent is in Korean, understand the meaning and apply it to the English reply.
+</user-intent>`;
+}
+
 export async function generateComment(
   tweetData: TweetData,
   tone: CommentTone,
   apiKey: string,
   persona?: PersonaData | null,
   length: CommentLength = 'medium',
-  stance: CommentStance = 'neutral'
+  stance: CommentStance = 'neutral',
+  userIntent?: string
 ): Promise<GenerationResult> {
   if (!apiKey) {
     throw new Error('API key is not configured.');
@@ -133,8 +148,12 @@ export async function generateComment(
   });
 
   const personaSection = buildPersonaSection(persona || null);
+  const userIntentSection = buildUserIntentSection(userIntent);
   const personaConstraint = persona
-    ? '\n5. Match the persona TONE only, never copy their phrases'
+    ? '\n6. Match the persona TONE only, never copy their phrases'
+    : '';
+  const userIntentCheck = userIntent
+    ? '\n- Does the reply reflect the user\'s specified intent?'
     : '';
 
   // Gemini 3 Pro optimized prompt structure: Role → Goal → Context → Constraints → Self-check
@@ -151,7 +170,22 @@ Write a single reply to the tweet below that sounds genuinely human and could sp
 ${tweetData.text}
 </tweet>
 </context>
-${personaSection}
+${personaSection}${userIntentSection}
+<pronoun-guidance>
+Before replying, identify WHO the tweet is about:
+- If discussing the tweet author's own experience: use "you" or address them directly
+- If discussing a third party (person, company, group): use "they", "he", "she", or the specific name
+- If discussing a shared experience or community: use "we"
+- If discussing the reader/audience: use "you" appropriately
+
+Match your pronouns to the tweet's actual subject. Do NOT default to "you" for everything.
+
+Examples:
+- Tweet: "Elon just announced new pricing" -> Reply about "he" or "Elon", not "you"
+- Tweet: "I tried the new feature today" -> Reply addressing "you" (the author)
+- Tweet: "Developers are frustrated with the API changes" -> Use "they" for developers
+</pronoun-guidance>
+
 <stance>
 ${STANCE_INSTRUCTIONS[stance]}
 
@@ -177,7 +211,8 @@ Bad replies feel like THIS:
 1. Respond to something SPECIFIC in the tweet, not the general topic
 2. Use natural, conversational language
 3. Vary your sentence structure
-4. No emojis, no hashtags, no em-dashes${personaConstraint}
+4. No emojis, no hashtags, no em-dashes
+5. Use correct pronouns for the tweet's subject${personaConstraint}
 </constraints>
 
 <self-check>
@@ -185,6 +220,7 @@ Before outputting, verify:
 - Does this sound like a real person with opinions?
 - Is the tone authentic to the requested style?
 - Would this feel natural in a Twitter thread?
+- Are pronouns correctly matched to the tweet's subject (not defaulting to "you")?${userIntentCheck}
 </self-check>
 
 Output only the reply text. No explanations or meta-commentary.`;

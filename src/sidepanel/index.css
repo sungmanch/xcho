@@ -1041,3 +1041,27 @@ body {
   background: var(--color-success-subtle);
   color: var(--color-success);
 }
+
+/* ==========================================================================
+   User Intent Input
+   ========================================================================== */
+
+.intent-input {
+  min-height: 60px;
+  resize: none;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.intent-input::placeholder {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+
+.input-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-top: var(--space-1);
+  font-style: italic;
+}

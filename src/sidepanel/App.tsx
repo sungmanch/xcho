@@ -30,6 +30,7 @@ function App() {
   const [selectedTone, setSelectedTone] = useState<CommentTone>('friendly');
   const [selectedLength, setSelectedLength] = useState<CommentLength>('medium');
   const [selectedStance, setSelectedStance] = useState<CommentStance>('neutral');
+  const [userIntent, setUserIntent] = useState('');
   const [tweetData, setTweetData] = useState<TweetData | null>(null);
   const [generatedComment, setGeneratedComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -155,7 +156,7 @@ function App() {
     setSuccess('');
 
     try {
-      const result = await generateComment(tweetData, selectedTone, apiKey, persona, selectedLength, selectedStance);
+      const result = await generateComment(tweetData, selectedTone, apiKey, persona, selectedLength, selectedStance, userIntent || undefined);
       setGeneratedComment(result.comment);
       setTokenUsage(result.usage);
       setTokenCost(result.cost);
@@ -322,6 +323,21 @@ function App() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* User Intent Input */}
+          <div className="input-group">
+            <label>Your Intent (Optional)</label>
+            <textarea
+              className="intent-input"
+              value={userIntent}
+              onChange={(e) => setUserIntent(e.target.value)}
+              placeholder="예: 이 주장에 반박하고 싶어 / 공감하면서 내 경험 공유 / 유머러스하게 질문하기"
+              rows={2}
+            />
+            <span className="input-hint">
+              Write in Korean or English how you want your reply to feel
+            </span>
           </div>
 
           <div className="generate-action">
