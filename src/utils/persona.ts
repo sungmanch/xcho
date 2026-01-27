@@ -1,6 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PersonaData } from '../types';
 import { storage } from './storage';
+import { getClient } from './gemini';
 
 const MODEL_NAME = 'gemini-3-pro-preview';
 
@@ -30,7 +30,7 @@ export async function analyzeWritings(
     throw new Error('No writings provided for analysis');
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
+  const genAI = getClient(apiKey);
   const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
   // Combine writings with separators

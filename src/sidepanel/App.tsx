@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { TweetData, CommentTone, CommentLength, CommentStance, MessagePayload, TokenUsage, TokenCost, PersonaData } from '../types';
+import { TweetData, CommentTone, CommentLength, CommentStance, MessagePayload, TokenUsage, TokenCost, PersonaData, GeminiModel, TranslationCacheEntry } from '../types';
 import { storage } from '../utils/storage';
-import { generateComment } from '../utils/gemini';
+import { generateCommentStream, DEFAULT_MODEL, AVAILABLE_MODELS, isKoreanText, translateTweet } from '../utils/gemini';
 import { analyzeWritings, savePersona, loadPersona, saveRawWritings, clearPersona } from '../utils/persona';
 
 const TONE_LABELS: Record<CommentTone, string> = {
@@ -30,6 +30,7 @@ function App() {
   const [selectedTone, setSelectedTone] = useState<CommentTone>('friendly');
   const [selectedLength, setSelectedLength] = useState<CommentLength>('medium');
   const [selectedStance, setSelectedStance] = useState<CommentStance>('neutral');
+  const [selectedModel, setSelectedModel] = useState<GeminiModel>(DEFAULT_MODEL);
   const [userIntent, setUserIntent] = useState('');
   const [tweetData, setTweetData] = useState<TweetData | null>(null);
   const [generatedComment, setGeneratedComment] = useState('');
@@ -45,6 +46,17 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Translation-related state
+  const [translation, setTranslation] = useState<string | null>(null);
+  const [translationSourceLang, setTranslationSourceLang] = useState<string>('');
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState<string>('');
+  const [isTranslationExpanded, setIsTranslationExpanded] = useState(true);
+  const [expandedOption, setExpandedOption] = useState<'tone' | 'stance' | 'length' | null>(null);
+  const [translationTokenUsage, setTranslationTokenUsage] = useState<TokenUsage | null>(null);
+  const [translationTokenCost, setTranslationTokenCost] = useState<TokenCost | null>(null);
+  const translationCacheRef = useRef<Map<string, TranslationCacheEntry>>(new Map());
+
   // Load API key, preferences, and persona on mount
   useEffect(() => {
     const loadSettings = async () => {
@@ -52,6 +64,7 @@ function App() {
       const savedTone = await storage.get('preferredTone');
       const savedLength = await storage.get('preferredLength');
       const savedStance = await storage.get('preferredStance');
+      const savedModel = await storage.get('selectedModel');
       const savedPersona = await loadPersona();
 
       if (savedApiKey) {
@@ -65,6 +78,9 @@ function App() {
       }
       if (savedStance) {
         setSelectedStance(savedStance);
+      }
+      if (savedModel) {
+        setSelectedModel(savedModel);
       }
       if (savedPersona) {
         setPersona(savedPersona);
@@ -106,6 +122,12 @@ function App() {
         setGeneratedComment('');
         setError('');
         setSuccess('');
+        // Clear translation state for new tweet
+        setTranslation(null);
+        setTranslationSourceLang('');
+        setTranslationError('');
+        setTranslationTokenUsage(null);
+        setTranslationTokenCost(null);
         sendResponse({ received: true });
       }
 
@@ -121,6 +143,48 @@ function App() {
       chrome.runtime.onMessage.removeListener(messageListener);
     };
   }, []);
+
+  // Manual translate handler
+  const handleTranslate = async () => {
+    if (!tweetData?.text || !apiKey) return;
+
+    // Generate cache key from tweet text
+    const cacheKey = tweetData.text.slice(0, 100);
+
+    // Check cache first
+    const cached = translationCacheRef.current.get(cacheKey);
+    if (cached) {
+      console.log('📦 Using cached translation');
+      setTranslation(cached.translatedText);
+      setTranslationSourceLang(cached.sourceLanguage);
+      return;
+    }
+
+    // Perform translation
+    setIsTranslating(true);
+    setTranslationError('');
+
+    try {
+      const result = await translateTweet(tweetData.text, apiKey, selectedModel);
+      setTranslation(result.translatedText);
+      setTranslationSourceLang(result.sourceLanguage);
+      setTranslationTokenUsage(result.usage);
+      setTranslationTokenCost(result.cost);
+
+      // Cache the result
+      translationCacheRef.current.set(cacheKey, {
+        translatedText: result.translatedText,
+        sourceLanguage: result.sourceLanguage,
+        timestamp: Date.now()
+      });
+      console.log('✅ Translation completed and cached');
+    } catch (err) {
+      console.error('❌ Translation failed:', err);
+      setTranslationError(err instanceof Error ? err.message : 'Translation failed');
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   const handleSaveApiKey = async () => {
     if (!apiKeyInput.trim()) {
@@ -154,9 +218,22 @@ function App() {
     setIsLoading(true);
     setError('');
     setSuccess('');
+    setGeneratedComment('');
+    setTokenUsage(null);
+    setTokenCost(null);
 
     try {
-      const result = await generateComment(tweetData, selectedTone, apiKey, persona, selectedLength, selectedStance, userIntent || undefined);
+      const result = await generateCommentStream(
+        tweetData,
+        selectedTone,
+        apiKey,
+        (text) => setGeneratedComment(text),
+        persona,
+        selectedLength,
+        selectedStance,
+        userIntent || undefined,
+        selectedModel
+      );
       setGeneratedComment(result.comment);
       setTokenUsage(result.usage);
       setTokenCost(result.cost);
@@ -277,51 +354,186 @@ function App() {
           )}
           <div className="tweet-content">{tweetData.text}</div>
 
-          {/* Tone Selection */}
-          <div className="input-group">
-            <label>Select Tone</label>
-            <div className="tone-selector">
-              {(Object.keys(TONE_LABELS) as CommentTone[]).map((tone) => (
-                <div
-                  key={tone}
-                  className={`tone-option ${selectedTone === tone ? 'selected' : ''}`}
-                  onClick={() => setSelectedTone(tone)}
-                >
-                  {TONE_LABELS[tone]}
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Translate Button - only show for non-Korean tweets */}
+          {!isKoreanText(tweetData.text) && !translation && !isTranslating && !translationError && (
+            <button
+              className="translate-btn"
+              onClick={handleTranslate}
+              disabled={!apiKey}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                <path d="m5 8 6 6"/>
+                <path d="m4 14 6-6 2-3"/>
+                <path d="M2 5h12"/>
+                <path d="M7 2h1"/>
+                <path d="m22 22-5-10-5 10"/>
+                <path d="M14 18h6"/>
+              </svg>
+              Translate
+            </button>
+          )}
 
-          {/* Stance Selection */}
-          <div className="input-group">
-            <label>Select Stance</label>
-            <div className="tone-selector">
-              {(Object.keys(STANCE_LABELS) as CommentStance[]).map((stance) => (
-                <div
-                  key={stance}
-                  className={`tone-option ${selectedStance === stance ? 'selected' : ''}`}
-                  onClick={() => setSelectedStance(stance)}
-                >
-                  {STANCE_LABELS[stance]}
+          {/* Korean Translation Section */}
+          {(translation || isTranslating || translationError) && (
+            <div className={`translation-section ${isTranslating ? 'translation-loading' : ''} ${translationError ? 'translation-error' : ''}`}>
+              <button
+                className="translation-header"
+                onClick={() => setIsTranslationExpanded(!isTranslationExpanded)}
+                aria-expanded={isTranslationExpanded}
+                disabled={isTranslating}
+              >
+                <div className="translation-header-left">
+                  <span className={`translation-icon ${isTranslating ? 'spinning' : ''}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                      <path d="m5 8 6 6"/>
+                      <path d="m4 14 6-6 2-3"/>
+                      <path d="M2 5h12"/>
+                      <path d="M7 2h1"/>
+                      <path d="m22 22-5-10-5 10"/>
+                      <path d="M14 18h6"/>
+                    </svg>
+                  </span>
+                  <span className="translation-label">
+                    {isTranslating ? 'Translating...' : translationError ? 'Translation failed' : 'Korean Translation'}
+                  </span>
+                  {translationSourceLang && !isTranslating && !translationError && (
+                    <span className="translation-lang-badge">{translationSourceLang.toUpperCase()}</span>
+                  )}
                 </div>
-              ))}
-            </div>
-          </div>
+                {!isTranslating && !translationError && (
+                  <span className={`translation-chevron ${isTranslationExpanded ? 'expanded' : ''}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </span>
+                )}
+                {translationError && (
+                  <button
+                    className="translation-retry"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTranslationError('');
+                      setTranslation(null);
+                    }}
+                  >
+                    Retry
+                  </button>
+                )}
+              </button>
 
-          {/* Length Selection */}
-          <div className="input-group">
-            <label>Select Length</label>
-            <div className="tone-selector">
-              {(Object.keys(LENGTH_LABELS) as CommentLength[]).map((length) => (
-                <div
-                  key={length}
-                  className={`tone-option ${selectedLength === length ? 'selected' : ''}`}
-                  onClick={() => setSelectedLength(length)}
-                >
-                  {LENGTH_LABELS[length]}
+              {isTranslationExpanded && translation && !translationError && (
+                <div className="translation-body">
+                  <div className="translation-text">{translation}</div>
+                  {translationTokenUsage && translationTokenCost && (
+                    <div className="translation-cost">
+                      <span>{translationTokenUsage.totalTokens.toLocaleString()} tokens</span>
+                      <span className="cost">${translationTokenCost.totalCost.toFixed(6)}</span>
+                    </div>
+                  )}
                 </div>
-              ))}
+              )}
+            </div>
+          )}
+
+          {/* Options Accordion */}
+          <div className="options-accordion">
+            {/* Tone Selection */}
+            <div className={`accordion-item ${expandedOption === 'tone' ? 'accordion-item--expanded' : ''}`}>
+              <button
+                className="accordion-header"
+                onClick={() => setExpandedOption(expandedOption === 'tone' ? null : 'tone')}
+              >
+                <span className="accordion-label">Tone</span>
+                <div className="accordion-header-right">
+                  <span className="accordion-value">{TONE_LABELS[selectedTone]}</span>
+                  <span className={`accordion-chevron ${expandedOption === 'tone' ? 'expanded' : ''}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </span>
+                </div>
+              </button>
+              {expandedOption === 'tone' && (
+                <div className="accordion-body">
+                  <div className="tone-selector">
+                    {(Object.keys(TONE_LABELS) as CommentTone[]).map((tone) => (
+                      <div
+                        key={tone}
+                        className={`tone-option ${selectedTone === tone ? 'selected' : ''}`}
+                        onClick={() => setSelectedTone(tone)}
+                      >
+                        {TONE_LABELS[tone]}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Stance Selection */}
+            <div className={`accordion-item ${expandedOption === 'stance' ? 'accordion-item--expanded' : ''}`}>
+              <button
+                className="accordion-header"
+                onClick={() => setExpandedOption(expandedOption === 'stance' ? null : 'stance')}
+              >
+                <span className="accordion-label">Stance</span>
+                <div className="accordion-header-right">
+                  <span className="accordion-value">{STANCE_LABELS[selectedStance]}</span>
+                  <span className={`accordion-chevron ${expandedOption === 'stance' ? 'expanded' : ''}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </span>
+                </div>
+              </button>
+              {expandedOption === 'stance' && (
+                <div className="accordion-body">
+                  <div className="tone-selector">
+                    {(Object.keys(STANCE_LABELS) as CommentStance[]).map((stance) => (
+                      <div
+                        key={stance}
+                        className={`tone-option ${selectedStance === stance ? 'selected' : ''}`}
+                        onClick={() => setSelectedStance(stance)}
+                      >
+                        {STANCE_LABELS[stance]}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Length Selection */}
+            <div className={`accordion-item ${expandedOption === 'length' ? 'accordion-item--expanded' : ''}`}>
+              <button
+                className="accordion-header"
+                onClick={() => setExpandedOption(expandedOption === 'length' ? null : 'length')}
+              >
+                <span className="accordion-label">Length</span>
+                <div className="accordion-header-right">
+                  <span className="accordion-value">{LENGTH_LABELS[selectedLength]}</span>
+                  <span className={`accordion-chevron ${expandedOption === 'length' ? 'expanded' : ''}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </span>
+                </div>
+              </button>
+              {expandedOption === 'length' && (
+                <div className="accordion-body">
+                  <div className="tone-selector">
+                    {(Object.keys(LENGTH_LABELS) as CommentLength[]).map((length) => (
+                      <div
+                        key={length}
+                        className={`tone-option ${selectedLength === length ? 'selected' : ''}`}
+                        onClick={() => setSelectedLength(length)}
+                      >
+                        {LENGTH_LABELS[length]}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -518,6 +730,30 @@ function App() {
                       </button>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Model Selection Section */}
+              <div className="settings-section">
+                <div className="settings-section-header">
+                  <h4>Model</h4>
+                </div>
+                <div className="settings-section-content">
+                  <select
+                    className="model-select"
+                    value={selectedModel}
+                    onChange={(e) => {
+                      const model = e.target.value as GeminiModel;
+                      setSelectedModel(model);
+                      storage.set('selectedModel', model);
+                    }}
+                  >
+                    {AVAILABLE_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} - {m.description}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
