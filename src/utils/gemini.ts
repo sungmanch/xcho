@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { TweetData, CommentTone, CommentLength, CommentStance, TokenCost, GenerationResult, PersonaData, GeminiModel, TranslationResult } from '../types';
+import { TweetData, CommentTone, CommentLength, CommentStance, TokenCost, GenerationResult, PersonaData, GeminiModel, TranslationResult, ExplanationResult } from '../types';
 
 // Default model - Gemini 3 Flash for faster response
 export const DEFAULT_MODEL: GeminiModel = 'gemini-3-flash-preview';
@@ -191,18 +191,16 @@ ${tweetData.text}
 </context>
 ${personaSection}${userIntentSection}
 <pronoun-guidance>
-Before replying, identify WHO the tweet is about:
-- If discussing the tweet author's own experience: use "you" or address them directly
-- If discussing a third party (person, company, group): use "they", "he", "she", or the specific name
-- If discussing a shared experience or community: use "we"
-- If discussing the reader/audience: use "you" appropriately
-
-Match your pronouns to the tweet's actual subject. Do NOT default to "you" for everything.
+Default to inclusive "we" to create a community-oriented tone:
+- For shared experiences, industry topics, or general observations: use "we" (preferred default)
+- If discussing the tweet author's personal experience: use "we" to include yourself, or "you" sparingly when directly addressing them
+- If discussing a specific third party: use "they", "he", "she", or the specific name
+- Avoid overusing "you" — it can feel preachy or distancing
 
 Examples:
+- Tweet: "Developers are frustrated with the API changes" -> "we've all been dealing with this" (not "they" or "you")
+- Tweet: "I tried the new feature today" -> "we should all give this a shot" or engage with shared experience
 - Tweet: "Elon just announced new pricing" -> Reply about "he" or "Elon", not "you"
-- Tweet: "I tried the new feature today" -> Reply addressing "you" (the author)
-- Tweet: "Developers are frustrated with the API changes" -> Use "they" for developers
 </pronoun-guidance>
 
 <stance>
@@ -231,7 +229,7 @@ Bad replies feel like THIS:
 2. Use natural, conversational language
 3. Vary your sentence structure
 4. No emojis, no hashtags, no em-dashes
-5. Use correct pronouns for the tweet's subject${personaConstraint}
+5. Prefer "we" over "you" for an inclusive, community tone${personaConstraint}
 </constraints>
 
 <self-check>
@@ -239,7 +237,7 @@ Before outputting, verify:
 - Does this sound like a real person with opinions?
 - Is the tone authentic to the requested style?
 - Would this feel natural in a Twitter thread?
-- Are pronouns correctly matched to the tweet's subject (not defaulting to "you")?${userIntentCheck}
+- Does the reply use "we" for community topics instead of defaulting to "you"?${userIntentCheck}
 </self-check>
 
 Output only the reply text. No explanations or meta-commentary.`;
@@ -323,18 +321,16 @@ ${tweetData.text}
 </context>
 ${personaSection}${userIntentSection}
 <pronoun-guidance>
-Before replying, identify WHO the tweet is about:
-- If discussing the tweet author's own experience: use "you" or address them directly
-- If discussing a third party (person, company, group): use "they", "he", "she", or the specific name
-- If discussing a shared experience or community: use "we"
-- If discussing the reader/audience: use "you" appropriately
-
-Match your pronouns to the tweet's actual subject. Do NOT default to "you" for everything.
+Default to inclusive "we" to create a community-oriented tone:
+- For shared experiences, industry topics, or general observations: use "we" (preferred default)
+- If discussing the tweet author's personal experience: use "we" to include yourself, or "you" sparingly when directly addressing them
+- If discussing a specific third party: use "they", "he", "she", or the specific name
+- Avoid overusing "you" — it can feel preachy or distancing
 
 Examples:
+- Tweet: "Developers are frustrated with the API changes" -> "we've all been dealing with this" (not "they" or "you")
+- Tweet: "I tried the new feature today" -> "we should all give this a shot" or engage with shared experience
 - Tweet: "Elon just announced new pricing" -> Reply about "he" or "Elon", not "you"
-- Tweet: "I tried the new feature today" -> Reply addressing "you" (the author)
-- Tweet: "Developers are frustrated with the API changes" -> Use "they" for developers
 </pronoun-guidance>
 
 <stance>
@@ -363,7 +359,7 @@ Bad replies feel like THIS:
 2. Use natural, conversational language
 3. Vary your sentence structure
 4. No emojis, no hashtags, no em-dashes
-5. Use correct pronouns for the tweet's subject${personaConstraint}
+5. Prefer "we" over "you" for an inclusive, community tone${personaConstraint}
 </constraints>
 
 <self-check>
@@ -371,7 +367,7 @@ Before outputting, verify:
 - Does this sound like a real person with opinions?
 - Is the tone authentic to the requested style?
 - Would this feel natural in a Twitter thread?
-- Are pronouns correctly matched to the tweet's subject (not defaulting to "you")?${userIntentCheck}
+- Does the reply use "we" for community topics instead of defaulting to "you"?${userIntentCheck}
 </self-check>
 
 Output only the reply text. No explanations or meta-commentary.`;
@@ -521,5 +517,102 @@ Return raw JSON only, no markdown formatting.
       throw new Error(`Translation failed: ${error.message}`);
     }
     throw new Error('An error occurred during translation.');
+  }
+}
+
+/**
+ * Generate a Korean explanation for a generated comment,
+ * including translation and relevance reasoning.
+ */
+export async function generateCommentExplanation(
+  tweetText: string,
+  generatedComment: string,
+  apiKey: string,
+  selectedModel: GeminiModel = DEFAULT_MODEL
+): Promise<ExplanationResult> {
+  if (!apiKey) {
+    throw new Error('API key is not configured.');
+  }
+
+  const genAI = getClient(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: selectedModel,
+    generationConfig: {
+      temperature: 0.3,
+    }
+  });
+
+  const prompt = `<role>
+You are a bilingual social media expert who explains English tweet replies in Korean.
+</role>
+
+<goal>
+Given an original tweet and a generated reply, provide:
+1. A natural Korean translation of the reply
+2. A brief Korean explanation of why this reply is appropriate for the tweet
+</goal>
+
+<original-tweet>
+${tweetText}
+</original-tweet>
+
+<generated-reply>
+${generatedComment}
+</generated-reply>
+
+<constraints>
+1. Translate the reply naturally into Korean (not literal translation)
+2. Explain in 1-2 sentences why this reply works well as a response to the tweet
+3. Keep the explanation concise and insightful
+4. Do not add extra commentary
+</constraints>
+
+<output-format>
+Return a JSON object with this exact structure:
+{
+  "koreanTranslation": "댓글의 한국어 번역",
+  "relevanceReason": "이 댓글이 원문 트윗에 적절한 이유 설명"
+}
+
+Return raw JSON only, no markdown formatting.
+</output-format>`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const responseText = response.text().trim();
+    const usageMetadata = response.usageMetadata;
+
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Invalid response format from AI');
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    const promptTokens = usageMetadata?.promptTokenCount || 0;
+    const completionTokens = usageMetadata?.candidatesTokenCount || 0;
+    const totalTokens = usageMetadata?.totalTokenCount || 0;
+
+    const cost = calculateCost(promptTokens, completionTokens, selectedModel);
+
+    return {
+      explanation: {
+        koreanTranslation: parsed.koreanTranslation || '',
+        relevanceReason: parsed.relevanceReason || '',
+      },
+      usage: {
+        promptTokens,
+        completionTokens,
+        totalTokens
+      },
+      cost,
+      model: selectedModel
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Explanation failed: ${error.message}`);
+    }
+    throw new Error('An error occurred while generating explanation.');
   }
 }
