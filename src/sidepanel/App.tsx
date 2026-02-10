@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { TweetData, CommentTone, CommentLength, CommentStance, MessagePayload, TokenUsage, TokenCost, PersonaData, GeminiModel, TranslationCacheEntry } from '../types';
-import { storage } from '../utils/storage';
-import { generateCommentStream, DEFAULT_MODEL, AVAILABLE_MODELS, isKoreanText, translateTweet } from '../utils/gemini';
+import { TweetData, CommentTone, CommentLength, CommentStance, MessagePayload, TokenUsage, TokenCost, PersonaData, GeminiModel, TranslationCacheEntry, CommentExplanation, SidePanelState } from '../types';
+import { storage, sessionStorage } from '../utils/storage';
+import { generateCommentStream, DEFAULT_MODEL, AVAILABLE_MODELS, isKoreanText, translateTweet, generateCommentExplanation } from '../utils/gemini';
 import { analyzeWritings, savePersona, loadPersona, saveRawWritings, clearPersona } from '../utils/persona';
 
 const TONE_LABELS: Record<CommentTone, string> = {
@@ -57,7 +57,33 @@ function App() {
   const [translationTokenCost, setTranslationTokenCost] = useState<TokenCost | null>(null);
   const translationCacheRef = useRef<Map<string, TranslationCacheEntry>>(new Map());
 
-  // Load API key, preferences, and persona on mount
+  // Explanation-related state
+  const [commentExplanation, setCommentExplanation] = useState<CommentExplanation | null>(null);
+  const [isExplaining, setIsExplaining] = useState(false);
+  const [explanationError, setExplanationError] = useState<string>('');
+  const [explanationTokenUsage, setExplanationTokenUsage] = useState<TokenUsage | null>(null);
+  const [explanationTokenCost, setExplanationTokenCost] = useState<TokenCost | null>(null);
+
+  // Save sidepanel state to session storage
+  const saveSidePanelState = async (overrides?: Partial<SidePanelState>) => {
+    const state: SidePanelState = {
+      tweetData,
+      generatedComment,
+      tokenUsage,
+      tokenCost,
+      currentModel,
+      commentExplanation,
+      lastUpdated: Date.now(),
+      ...overrides,
+    };
+    try {
+      await sessionStorage.set('sidePanelState', state);
+    } catch {
+      // Silently fail - session storage not critical
+    }
+  };
+
+  // Load API key, preferences, persona, and restore session state on mount
   useEffect(() => {
     const loadSettings = async () => {
       const savedApiKey = await storage.get('apiKey');
@@ -85,6 +111,22 @@ function App() {
       if (savedPersona) {
         setPersona(savedPersona);
       }
+
+      // Restore session state
+      try {
+        const savedState = await sessionStorage.get('sidePanelState');
+        if (savedState) {
+          console.log('🔄 Restoring sidepanel state from session storage');
+          if (savedState.tweetData) setTweetData(savedState.tweetData);
+          if (savedState.generatedComment) setGeneratedComment(savedState.generatedComment);
+          if (savedState.tokenUsage) setTokenUsage(savedState.tokenUsage);
+          if (savedState.tokenCost) setTokenCost(savedState.tokenCost);
+          if (savedState.currentModel) setCurrentModel(savedState.currentModel);
+          if (savedState.commentExplanation) setCommentExplanation(savedState.commentExplanation);
+        }
+      } catch {
+        console.log('ℹ️ No session state to restore');
+      }
     };
 
     loadSettings();
@@ -93,10 +135,24 @@ function App() {
     // This handles the case when sidepanel opens after tweet data was already sent
     console.log('🔄 Sidepanel: Requesting cached tweet data from background');
     chrome.runtime.sendMessage({ type: 'GET_CURRENT_TWEET' })
-      .then((response) => {
+      .then(async (response) => {
         console.log('📨 Sidepanel: Received cached data response:', response);
         if (response?.data) {
-          setTweetData(response.data as TweetData);
+          const newTweet = response.data as TweetData;
+
+          // Compare with saved state - if same tweet, keep generated results
+          try {
+            const savedState = await sessionStorage.get('sidePanelState');
+            if (savedState?.tweetData?.text === newTweet.text && savedState.generatedComment) {
+              console.log('✅ Same tweet detected, preserving generated results');
+              setTweetData(newTweet);
+              return;
+            }
+          } catch {
+            // Fall through to set new tweet
+          }
+
+          setTweetData(newTweet);
           console.log('✅ Sidepanel: Loaded cached tweet data');
         }
       })
@@ -128,6 +184,11 @@ function App() {
         setTranslationError('');
         setTranslationTokenUsage(null);
         setTranslationTokenCost(null);
+        // Clear explanation state for new tweet
+        setCommentExplanation(null);
+        setExplanationError('');
+        setExplanationTokenUsage(null);
+        setExplanationTokenCost(null);
         sendResponse({ received: true });
       }
 
@@ -204,6 +265,36 @@ function App() {
     }
   };
 
+  // Generate explanation after comment is generated
+  const handleExplanation = async (tweet: TweetData, comment: string) => {
+    if (!apiKey || !comment) return;
+
+    setIsExplaining(true);
+    setExplanationError('');
+
+    try {
+      const result = await generateCommentExplanation(
+        tweet.text,
+        comment,
+        apiKey,
+        selectedModel
+      );
+      setCommentExplanation(result.explanation);
+      setExplanationTokenUsage(result.usage);
+      setExplanationTokenCost(result.cost);
+
+      // Save state with explanation
+      await saveSidePanelState({
+        commentExplanation: result.explanation,
+      });
+    } catch (err) {
+      console.error('❌ Explanation failed:', err);
+      setExplanationError(err instanceof Error ? err.message : 'Explanation failed');
+    } finally {
+      setIsExplaining(false);
+    }
+  };
+
   const handleGenerateComment = async () => {
     if (!apiKey) {
       setError('Please set up your API key first.');
@@ -221,6 +312,8 @@ function App() {
     setGeneratedComment('');
     setTokenUsage(null);
     setTokenCost(null);
+    setCommentExplanation(null);
+    setExplanationError('');
 
     try {
       const result = await generateCommentStream(
@@ -243,6 +336,18 @@ function App() {
       await storage.set('preferredTone', selectedTone);
       await storage.set('preferredLength', selectedLength);
       await storage.set('preferredStance', selectedStance);
+
+      // Save state to session storage
+      await saveSidePanelState({
+        tweetData,
+        generatedComment: result.comment,
+        tokenUsage: result.usage,
+        tokenCost: result.cost,
+        currentModel: result.model,
+      });
+
+      // Auto-generate explanation
+      handleExplanation(tweetData, result.comment);
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
@@ -596,6 +701,8 @@ function App() {
                 setGeneratedComment('');
                 setTokenUsage(null);
                 setTokenCost(null);
+                setCommentExplanation(null);
+                setExplanationError('');
               }}
             >
               Reset
@@ -623,6 +730,56 @@ function App() {
                 <span>{tokenUsage.totalTokens.toLocaleString()} tokens</span>
                 <span className="cost">${tokenCost.totalCost.toFixed(6)}</span>
               </div>
+            </div>
+          )}
+
+          {/* Comment Explanation Section */}
+          {(commentExplanation || isExplaining || explanationError) && (
+            <div className={`explanation-section ${isExplaining ? 'explanation-loading' : ''} ${explanationError ? 'explanation-error' : ''}`}>
+              <div className="explanation-header">
+                <span className={`explanation-icon ${isExplaining ? 'spinning' : ''}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 16v-4"/>
+                    <path d="M12 8h.01"/>
+                  </svg>
+                </span>
+                <span className="explanation-label">
+                  {isExplaining ? 'Analyzing...' : explanationError ? 'Analysis failed' : 'Comment Analysis'}
+                </span>
+                {explanationError && (
+                  <button
+                    className="explanation-retry"
+                    onClick={() => {
+                      setExplanationError('');
+                      if (tweetData && generatedComment) {
+                        handleExplanation(tweetData, generatedComment);
+                      }
+                    }}
+                  >
+                    Retry
+                  </button>
+                )}
+              </div>
+
+              {commentExplanation && !explanationError && (
+                <div className="explanation-body">
+                  <div className="explanation-card">
+                    <div className="explanation-card-label">Korean Translation</div>
+                    <div className="explanation-card-text">{commentExplanation.koreanTranslation}</div>
+                  </div>
+                  <div className="explanation-card">
+                    <div className="explanation-card-label">Why This Works</div>
+                    <div className="explanation-card-text">{commentExplanation.relevanceReason}</div>
+                  </div>
+                  {explanationTokenUsage && explanationTokenCost && (
+                    <div className="explanation-cost">
+                      <span>{explanationTokenUsage.totalTokens.toLocaleString()} tokens</span>
+                      <span className="cost">${explanationTokenCost.totalCost.toFixed(6)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

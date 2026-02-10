@@ -1384,3 +1384,120 @@ body {
   background: var(--color-error);
   color: white;
 }
+
+/* ==========================================================================
+   Comment Explanation Section
+   ========================================================================== */
+
+.explanation-section {
+  margin-top: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-secondary);
+}
+
+.explanation-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+
+.explanation-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent);
+}
+
+.explanation-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
+.explanation-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex: 1;
+}
+
+.explanation-retry {
+  background: none;
+  border: 1px solid var(--color-error);
+  color: var(--color-error);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.explanation-retry:hover {
+  background: var(--color-error);
+  color: white;
+}
+
+.explanation-body {
+  padding: var(--space-3);
+  padding-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  animation: slideDown var(--duration-normal) var(--ease-out);
+}
+
+.explanation-card {
+  background: var(--color-bg-primary);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--color-accent);
+}
+
+.explanation-card-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-1);
+}
+
+.explanation-card-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+}
+
+.explanation-cost {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-text-tertiary);
+}
+
+.explanation-cost .cost {
+  color: var(--color-success);
+  font-weight: 500;
+}
+
+/* Loading state */
+.explanation-loading {
+  opacity: 0.7;
+}
+
+/* Error state */
+.explanation-error {
+  border-color: var(--color-error);
+  background: var(--color-error-subtle);
+}
+
+.explanation-error .explanation-label {
+  color: var(--color-error);
+}
