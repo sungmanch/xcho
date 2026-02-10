@@ -69,6 +69,35 @@ export interface TranslationCache {
   [key: string]: TranslationCacheEntry;
 }
 
+// Comment explanation (Korean translation + relevance)
+export interface CommentExplanation {
+  koreanTranslation: string;
+  relevanceReason: string;
+}
+
+export interface ExplanationResult {
+  explanation: CommentExplanation;
+  usage: TokenUsage;
+  cost: TokenCost;
+  model: string;
+}
+
+// Session storage for state persistence across sidepanel reopens
+export interface SessionStorageData {
+  tweetCache?: Record<string, TweetData>;
+  sidePanelState?: SidePanelState;
+}
+
+export interface SidePanelState {
+  tweetData: TweetData | null;
+  generatedComment: string;
+  tokenUsage: TokenUsage | null;
+  tokenCost: TokenCost | null;
+  currentModel: string;
+  commentExplanation: CommentExplanation | null;
+  lastUpdated: number;
+}
+
 // Persona data for personalized responses
 export interface PersonaData {
   writingStyle: {
