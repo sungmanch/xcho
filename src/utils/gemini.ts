@@ -168,39 +168,25 @@ If the intent is in Korean, understand the meaning and apply it to the English r
 </user-intent>`;
 }
 
-export async function generateComment(
-  tweetData: TweetData,
+// Build the full comment generation prompt — single source of truth for both sync and stream paths
+function buildCommentPrompt(
+  tweetText: string,
   tone: CommentTone,
-  apiKey: string,
-  persona?: PersonaData | null,
-  length: CommentLength = 'medium',
-  stance: CommentStance = 'neutral',
+  length: CommentLength,
+  stance: CommentStance,
+  persona: PersonaData | null,
   userIntent?: string,
-  selectedModel: GeminiModel = DEFAULT_MODEL
-): Promise<GenerationResult> {
-  if (!apiKey) {
-    throw new Error('API key is not configured.');
-  }
-
-  const genAI = getClient(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: selectedModel,
-    generationConfig: {
-      temperature: 1.0,
-    }
-  });
-
-  const personaSection = buildPersonaSection(persona || null);
+): string {
+  const personaSection = buildPersonaSection(persona);
   const userIntentSection = buildUserIntentSection(userIntent);
   const personaConstraint = persona
-    ? '\n9. Match the persona TONE only, never copy their phrases'
+    ? '\n10. Match the persona TONE only, never copy their phrases'
     : '';
   const userIntentCheck = userIntent
     ? '\n- Does the reply reflect the user\'s specified intent?'
     : '';
 
-  // Gemini 3 Pro optimized prompt structure: Role → Goal → Context → Constraints → Self-check
-  const prompt = `<role>
+  return `<role>
 You are a skilled X (Twitter) user who writes replies that stop the scroll. You have sharp opinions and an authentic voice. You share what you think, not what you've done.
 </role>
 
@@ -210,7 +196,7 @@ Write a single reply that hooks readers instantly — the kind that makes people
 
 <context>
 <tweet>
-${tweetData.text}
+${tweetText}
 </tweet>
 </context>
 ${personaSection}${userIntentSection}
@@ -279,6 +265,31 @@ Before outputting, verify:
 </self-check>
 
 Output only the reply text. No explanations or meta-commentary.`;
+}
+
+export async function generateComment(
+  tweetData: TweetData,
+  tone: CommentTone,
+  apiKey: string,
+  persona?: PersonaData | null,
+  length: CommentLength = 'medium',
+  stance: CommentStance = 'neutral',
+  userIntent?: string,
+  selectedModel: GeminiModel = DEFAULT_MODEL
+): Promise<GenerationResult> {
+  if (!apiKey) {
+    throw new Error('API key is not configured.');
+  }
+
+  const genAI = getClient(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: selectedModel,
+    generationConfig: {
+      temperature: 1.0,
+    }
+  });
+
+  const prompt = buildCommentPrompt(tweetData.text, tone, length, stance, persona || null, userIntent);
 
   try {
     const result = await model.generateContent(prompt);
@@ -335,94 +346,7 @@ export async function generateCommentStream(
     }
   });
 
-  const personaSection = buildPersonaSection(persona || null);
-  const userIntentSection = buildUserIntentSection(userIntent);
-  const personaConstraint = persona
-    ? '\n9. Match the persona TONE only, never copy their phrases'
-    : '';
-  const userIntentCheck = userIntent
-    ? '\n- Does the reply reflect the user\'s specified intent?'
-    : '';
-
-  const prompt = `<role>
-You are a skilled X (Twitter) user who writes replies that stop the scroll. You have sharp opinions and an authentic voice. You share what you think, not what you've done.
-</role>
-
-<goal>
-Write a single reply that hooks readers instantly — the kind that makes people retweet, quote, or jump into the thread.
-</goal>
-
-<context>
-<tweet>
-${tweetData.text}
-</tweet>
-</context>
-${personaSection}${userIntentSection}
-<voice>
-Write like a real person firing off a reply, not a copywriter crafting a message.
-
-Pronoun hierarchy (most to least natural):
-1. No subject — fragment or impersonal ("Misses the point entirely", "Not even close")
-2. "This/That" — demonstrative reference ("This only works if...", "That's the part nobody talks about")
-3. "I" — personal take when it adds weight ("I've watched this fail three times", "I think the real issue is...")
-4. "we" — ONLY when genuinely referring to an industry or community ("...and we still haven't figured out auth")
-
-NEVER use "you" to address the tweet author — it always sounds preachy.
-Sentence fragments are fine. Real replies aren't essays.
-Never fabricate personal experience — state opinions, not stories.
-CRITICAL: Never start with "I'd argue". Vary your openings every time.
-</voice>
-
-<stance>
-${STANCE_INSTRUCTIONS[stance]}
-
-Express your stance naturally through your response. Do NOT explicitly say "I agree" or "I disagree".
-</stance>
-
-<reply-style>
-Tone: ${TONE_INSTRUCTIONS[tone]}
-Length: ${LENGTH_INSTRUCTIONS[length]}
-
-Strong replies look like THIS:
-- "The real problem isn't X here. Everyone keeps ignoring Y"
-- "Works in theory but falls apart the moment it needs to scale"
-- "This only makes sense if you assume Z is constant. It's not"
-- "I've seen this exact pattern fail at three different companies"
-- "That's the neat part — it doesn't"
-- "Missing something crucial here. The assumption that..."
-- "Not even remotely the same thing. One is X, the other is Y"
-
-Weak replies look like THIS:
-- "Great point! Totally agree!" (empty validation)
-- "This is so important for everyone to understand" (corporate speak)
-- "You should really think about this differently" (preachy, finger-pointing)
-- "Thanks for sharing! This really resonates" (AI cheerleading)
-- "We need to have a conversation about this" (performative concern)
-</reply-style>
-
-<constraints>
-1. Hook the reader in the first few words — make them stop scrolling
-2. Respond to something SPECIFIC in the tweet, not the general topic
-3. Be bold — strong takes get engagement, safe takes get ignored
-4. Use concrete details over abstract concepts
-5. No emojis, no hashtags, no em-dashes
-6. Never claim experience you don't have — state opinions, not stories
-7. NEVER use these overused openers: "I'd argue", "Unpopular opinion:", "This.", "Here's the thing"
-8. Never address the tweet author with "you" — drop the subject, use "this/that", or use impersonal framing
-9. Fragments > full sentences. Write like a reply, not a paragraph${personaConstraint}
-</constraints>
-
-<self-check>
-Before outputting, verify:
-- Would this stop someone mid-scroll? Is there a hook?
-- Does this sound like someone with a real POV, not a bot?
-- Is there a specific take, not just generic agreement?
-- Would someone want to reply to this?
-- Does this sound like an honest opinion, not a fabricated experience?
-- Read it back: does it sound like a real tweet reply, or like an AI wrote it?${userIntentCheck}
-</self-check>
-
-Output only the reply text. No explanations or meta-commentary.`;
+  const prompt = buildCommentPrompt(tweetData.text, tone, length, stance, persona || null, userIntent);
 
   try {
     const result = await model.generateContentStream(prompt);
