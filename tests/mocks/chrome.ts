@@ -57,8 +57,5 @@ export function createChromeStorageMock() {
     _reset: () => {
       store.clear();
     },
-
-    /** Expose store for inspection in tests */
-    _store: store,
   };
 }
