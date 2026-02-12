@@ -1,5 +1,5 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { TweetData, CommentTone, CommentLength, CommentStance, TokenCost, GenerationResult, PersonaData, GeminiModel, TranslationResult, ExplanationResult } from '../types';
+import { GoogleGenerativeAI, GenerateContentResponse } from '@google/generative-ai';
+import { TweetData, CommentTone, CommentLength, CommentStance, TokenCost, TokenUsage, GenerationResult, PersonaData, GeminiModel, TranslationResult, ExplanationResult } from '../types';
 
 // Default model - Gemini 3 Flash for faster response
 export const DEFAULT_MODEL: GeminiModel = 'gemini-3-flash-preview';
@@ -86,6 +86,17 @@ export function calculateCost(
   };
 }
 
+// Extract token usage from a Gemini API response
+function extractUsage(response: GenerateContentResponse, model: string): { usage: TokenUsage; cost: TokenCost } {
+  const meta = response.usageMetadata;
+  const usage: TokenUsage = {
+    promptTokens: meta?.promptTokenCount || 0,
+    completionTokens: meta?.candidatesTokenCount || 0,
+    totalTokens: meta?.totalTokenCount || 0,
+  };
+  return { usage, cost: calculateCost(usage.promptTokens, usage.completionTokens, model) };
+}
+
 // Build persona section for prompt - focuses ONLY on tone/manner, ignores phrases
 export function buildPersonaSection(persona: PersonaData | null): string {
   if (!persona) return '';
@@ -138,10 +149,9 @@ export function buildPersonaSection(persona: PersonaData | null): string {
     };
     const hook = hookMap[persona.opinionStyle.hookPattern] || '';
     const arg = argMap[persona.opinionStyle.argumentStyle] || '';
-    if (hook || arg) {
-      opinionGuide = `\n\nOpinion expression style:
-${hook ? `- ${hook}` : ''}
-${arg ? `- ${arg}` : ''}`;
+    const lines = [hook, arg].filter(Boolean).map(l => `- ${l}`);
+    if (lines.length > 0) {
+      opinionGuide = `\n\nOpinion expression style:\n${lines.join('\n')}`;
     }
   }
 
@@ -294,24 +304,11 @@ export async function generateComment(
   try {
     const result = await model.generateContent(prompt);
     const response = result.response;
-    const text = response.text();
-    const usageMetadata = response.usageMetadata;
-
-    // Extract token counts
-    const promptTokens = usageMetadata?.promptTokenCount || 0;
-    const completionTokens = usageMetadata?.candidatesTokenCount || 0;
-    const totalTokens = usageMetadata?.totalTokenCount || 0;
-
-    // Calculate costs
-    const cost = calculateCost(promptTokens, completionTokens, selectedModel);
+    const { usage, cost } = extractUsage(response, selectedModel);
 
     return {
-      comment: text.trim(),
-      usage: {
-        promptTokens,
-        completionTokens,
-        totalTokens
-      },
+      comment: response.text().trim(),
+      usage,
       cost,
       model: selectedModel
     };
@@ -358,21 +355,11 @@ export async function generateCommentStream(
     }
 
     const response = await result.response;
-    const usageMetadata = response.usageMetadata;
-
-    const promptTokens = usageMetadata?.promptTokenCount || 0;
-    const completionTokens = usageMetadata?.candidatesTokenCount || 0;
-    const totalTokens = usageMetadata?.totalTokenCount || 0;
-
-    const cost = calculateCost(promptTokens, completionTokens, selectedModel);
+    const { usage, cost } = extractUsage(response, selectedModel);
 
     return {
       comment: fullText.trim(),
-      usage: {
-        promptTokens,
-        completionTokens,
-        totalTokens
-      },
+      usage,
       cost,
       model: selectedModel
     };
@@ -459,32 +446,19 @@ Return raw JSON only, no markdown formatting.
     const result = await model.generateContent(prompt);
     const response = result.response;
     const responseText = response.text().trim();
-    const usageMetadata = response.usageMetadata;
 
-    // Parse JSON response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('Invalid response format from AI');
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
-
-    // Extract token counts
-    const promptTokens = usageMetadata?.promptTokenCount || 0;
-    const completionTokens = usageMetadata?.candidatesTokenCount || 0;
-    const totalTokens = usageMetadata?.totalTokenCount || 0;
-
-    // Calculate costs
-    const cost = calculateCost(promptTokens, completionTokens, selectedModel);
+    const { usage, cost } = extractUsage(response, selectedModel);
 
     return {
       translatedText: parsed.translatedText || text,
       sourceLanguage: parsed.sourceLanguage || 'unknown',
-      usage: {
-        promptTokens,
-        completionTokens,
-        totalTokens
-      },
+      usage,
       cost,
       model: selectedModel
     };
@@ -557,7 +531,6 @@ Return raw JSON only, no markdown formatting.
     const result = await model.generateContent(prompt);
     const response = result.response;
     const responseText = response.text().trim();
-    const usageMetadata = response.usageMetadata;
 
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
@@ -565,23 +538,14 @@ Return raw JSON only, no markdown formatting.
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
-
-    const promptTokens = usageMetadata?.promptTokenCount || 0;
-    const completionTokens = usageMetadata?.candidatesTokenCount || 0;
-    const totalTokens = usageMetadata?.totalTokenCount || 0;
-
-    const cost = calculateCost(promptTokens, completionTokens, selectedModel);
+    const { usage, cost } = extractUsage(response, selectedModel);
 
     return {
       explanation: {
         koreanTranslation: parsed.koreanTranslation || '',
         relevanceReason: parsed.relevanceReason || '',
       },
-      usage: {
-        promptTokens,
-        completionTokens,
-        totalTokens
-      },
+      usage,
       cost,
       model: selectedModel
     };
