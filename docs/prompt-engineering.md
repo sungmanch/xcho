@@ -83,7 +83,7 @@ The voice section contains the most critical behavioral instructions:
 
 - **Lead with a sharp opinion or observation** -- Forces the model to front-load the interesting part instead of building up to it.
 - **Frame opinions as YOUR take, not universal truth** -- Prevents authoritative-sounding declarations that come across as pretentious.
-- **Default to inclusive "we"** -- Frames comments from a shared community perspective rather than pointing at the tweet author. "We keep making this mistake" reads better than "You're making this mistake".
+- **Open with variety** -- Rotate across fragment, demonstrative, noun phrase, gerund, conditional, and imperative patterns. Avoids pronoun-heavy openers that feel formulaic.
 - **Only use "you" for specific third parties** -- Prevents the model from lecturing the tweet author directly.
 - **Never fabricate personal experience** -- State opinions, not stories. Stops the model from generating "When I worked at Google..." type fabrications.
 - **CRITICAL: Never start with "I'd argue"** -- Marked as critical because early iterations showed this phrase appearing in a majority of generations. It became a verbal tic of the model.
@@ -107,8 +107,8 @@ All stances include: "Express your stance naturally through your response. Do NO
 This section serves two purposes: it sets tone and length parameters, and it provides calibration examples.
 
 **Strong examples** demonstrate the target quality:
-- "The real problem isn't X here. It's that we keep ignoring Y"
-- "Hot take -- this works in theory but falls apart the moment we try to scale"
+- "The real problem isn't X here. Everyone keeps ignoring Y"
+- "Works in theory but falls apart the moment it needs to scale"
 
 **Weak examples** show what to avoid, with parenthetical labels:
 - "Great point! Totally agree!" (empty validation)
@@ -127,8 +127,8 @@ Eight base constraints plus conditionally injected rules:
 4. **Concrete details over abstract concepts** -- Specificity breeds authenticity
 5. **No emojis, no hashtags, no em-dashes** -- Maintain a clean, text-first aesthetic
 6. **Never claim experience** -- Opinions, not stories
-7. **Banned openers** -- "I'd argue", "Unpopular opinion:", "This.", "Here's the thing"
-8. **"We" over "you"** -- Community perspective
+7. **Banned openers** -- "I'd argue", "Unpopular opinion:", "This.", "Here's the thing", "We [verb]..."
+8. **Never address with "you"** -- Drop the subject, use "this/that", or use impersonal framing
 9. *(Conditional)* **Match persona TONE only, never copy phrases** -- Added when persona exists
 10. *(Implicit, via self-check)* **Reflect user's specified intent** -- Added when user intent exists
 
@@ -141,7 +141,7 @@ A checklist the model runs before producing output:
 - Is there a specific take, not generic agreement?
 - Would someone want to reply to this?
 - Is this an honest opinion, not fabricated experience?
-- Does it use "we" for community perspective?
+- Does the opening avoid banned patterns ("I'd argue", "We...", etc.)?
 - *(Conditional)* Does it reflect the user's specified intent?
 
 ## Dynamic Sections
@@ -211,11 +211,13 @@ These are injected via string concatenation rather than conditional template blo
 
 In early iterations, the model started a majority of replies with "I'd argue that..." regardless of stance or tone. This was a Gemini-specific verbal tic. The prohibition now appears in two places -- `<voice>` (marked CRITICAL) and `<constraints>` rule #7 -- because a single mention was insufficient to suppress it reliably.
 
-### "We" Framing Over "You"
+### Opener Diversity
 
-Using "you" when addressing the tweet author creates a preachy, lecturing tone: "You should really think about this differently." Switching to "we" creates shared perspective: "We keep overlooking this part." This single change dramatically improved the perceived authenticity of generated replies.
+Early prompts defaulted to inclusive "we" framing ("We keep overlooking this part") to avoid preachy "you" addressing. While this improved tone, it created a new problem: the model over-indexed on "We [verb]..." as a sentence opener, making replies feel formulaic.
 
-The rule appears in `<voice>`, `<constraints>`, and `<self-check>` for triple reinforcement.
+The fix follows Gemini 3 Flash best practices: provide six concrete opener patterns to rotate through (fragments, demonstratives, noun phrases, gerunds, conditionals, imperatives) rather than prohibiting specific pronouns. "we" is allowed mid-sentence but banned as a sentence opener via constraint #7.
+
+Gemini 3 Flash over-analyzes repeated instructions, so each rule now appears once in its most natural location rather than using "triple reinforcement" across multiple sections.
 
 ### No Emoji / No Hashtag Rule
 
