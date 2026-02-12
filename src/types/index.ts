@@ -82,10 +82,21 @@ export interface ExplanationResult {
   model: string;
 }
 
+// Per-tweet cached results (comment + explanation)
+export interface TweetResults {
+  generatedComment: string;
+  tokenUsage: TokenUsage | null;
+  tokenCost: TokenCost | null;
+  currentModel: string;
+  commentExplanation: CommentExplanation | null;
+  lastUpdated: number;
+}
+
 // Session storage for state persistence across sidepanel reopens
 export interface SessionStorageData {
   tweetCache?: Record<string, TweetData>;
   sidePanelState?: SidePanelState;
+  tweetResultsCache?: Record<string, TweetResults>;
 }
 
 export interface SidePanelState {
@@ -105,6 +116,10 @@ export interface PersonaData {
     formality: 'casual' | 'neutral' | 'formal';
     humor: boolean;
     directness: 'direct' | 'indirect';
+  };
+  opinionStyle?: {
+    hookPattern: 'question' | 'bold-claim' | 'reframe' | 'observation';
+    argumentStyle: 'evidence' | 'analogy' | 'reframe' | 'direct-assertion';
   };
   commonPhrases: string[];
   topics: string[];
