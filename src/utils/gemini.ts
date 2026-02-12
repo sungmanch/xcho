@@ -71,7 +71,7 @@ const STANCE_INSTRUCTIONS: Record<CommentStance, string> = {
 };
 
 // Calculate cost based on token usage
-function calculateCost(
+export function calculateCost(
   inputTokens: number,
   outputTokens: number,
   model: string
@@ -87,7 +87,7 @@ function calculateCost(
 }
 
 // Build persona section for prompt - focuses ONLY on tone/manner, ignores phrases
-function buildPersonaSection(persona: PersonaData | null): string {
+export function buildPersonaSection(persona: PersonaData | null): string {
   if (!persona) return '';
 
   const { writingStyle } = persona;
@@ -155,7 +155,7 @@ CRITICAL: Match the TONE and MANNER only. Use your own vocabulary. Never copy sp
 }
 
 // Build user intent section - handles Korean/English input for comment direction
-function buildUserIntentSection(userIntent: string | undefined): string {
+export function buildUserIntentSection(userIntent: string | undefined): string {
   if (!userIntent || userIntent.trim() === '') return '';
 
   return `
