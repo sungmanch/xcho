@@ -21,7 +21,7 @@
     "noFallthroughCasesInSwitch": true,
 
     /* Chrome Extension */
-    "types": ["chrome", "vite/client"]
+    "types": ["chrome", "vite/client", "vitest/globals"]
   },
-  "include": ["src"]
+  "include": ["src", "tests"]
 }

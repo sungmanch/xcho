@@ -19,6 +19,26 @@ After building, load the extension in Chrome:
 2. Enable "Developer mode"
 3. Click "Load unpacked" and select the `dist` folder
 
+## Test Commands
+
+```bash
+npm test             # Run all tests once
+npm run test:watch   # Watch mode during development
+```
+
+### Test Architecture
+
+- **Framework**: Vitest with jsdom environment
+- **Setup**: `tests/setup.ts` provides global Chrome API mocks
+- **Mocks**: `tests/mocks/chrome.ts` (storage mock factory), `tests/mocks/gemini.ts` (Gemini SDK mock)
+- **Tests**: `tests/utils/` contains tests for gemini.ts, storage.ts, persona.ts
+
+## Documentation
+
+- [docs/architecture.md](docs/architecture.md): Message flow, state management, caching strategy
+- [docs/prompt-engineering.md](docs/prompt-engineering.md): Prompt structure and design decisions
+- [docs/development.md](docs/development.md): Development workflow, testing, debugging
+
 ## Architecture
 
 ### Chrome Extension Structure (Manifest V3)
@@ -49,6 +69,13 @@ User clicks tweet → Content Script extracts data → sends TWEET_CLICKED messa
 → Background returns cached data → UI displays tweet + generation options
 ```
 
+### Caching Strategy
+
+- **Per-tab tweet cache**: Background stores latest tweet per tab in `chrome.storage.session` (keyed by tabId, cleaned on tab close)
+- **Per-tweet results cache**: Side panel caches generated comments per tweet in `chrome.storage.session` (LRU eviction at 10 entries, keyed by first 200 chars of tweet text)
+- **Translation cache**: In-memory Map via React `useRef` (keyed by first 100 chars of tweet text, lives for session duration)
+- **Session state**: Side panel state persisted to `chrome.storage.session` for survival across panel close/reopen
+
 ### Key Utilities
 
 - [src/utils/gemini.ts](src/utils/gemini.ts): LLM integration with structured prompting (role/goal/context/constraints pattern), token tracking, and cost calculation
@@ -69,5 +96,5 @@ See [DEBUGGING.md](DEBUGGING.md) for step-by-step debugging guide. Key debugging
 ## Configuration
 
 - Gemini API key stored in chrome.storage.local
-- Current model: `gemini-3-pro-preview` (configurable in gemini.ts)
+- Default model: `gemini-3-flash-preview` (configurable via UI, defined in gemini.ts)
 - Model pricing defined in MODEL_PRICING constant for cost tracking
