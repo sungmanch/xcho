@@ -55,7 +55,7 @@ export function createChromeStorageMock() {
 
     /** Reset the internal store (useful in beforeEach) */
     _reset: () => {
-      store = new Map<string, unknown>();
+      store.clear();
     },
 
     /** Expose store for inspection in tests */
