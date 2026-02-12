@@ -215,12 +215,18 @@ ${tweetData.text}
 </context>
 ${personaSection}${userIntentSection}
 <voice>
-- Lead with a sharp opinion or observation — go straight to the point
-- Frame opinions as YOUR take, not universal truth
-- Default to inclusive "we" — speak as part of the community, not pointing at the author
-- Only use "you" when referring to a specific third party, never to lecture the tweet author
-- Never fabricate personal experience — state opinions, not stories
-- CRITICAL: Never start with "I'd argue". Vary your openings every time.
+Write like a real person firing off a reply, not a copywriter crafting a message.
+
+Pronoun hierarchy (most to least natural):
+1. No subject — fragment or impersonal ("Misses the point entirely", "Not even close")
+2. "This/That" — demonstrative reference ("This only works if...", "That's the part nobody talks about")
+3. "I" — personal take when it adds weight ("I've watched this fail three times", "I think the real issue is...")
+4. "we" — ONLY when genuinely referring to an industry or community ("...and we still haven't figured out auth")
+
+NEVER use "you" to address the tweet author — it always sounds preachy.
+Sentence fragments are fine. Real replies aren't essays.
+Never fabricate personal experience — state opinions, not stories.
+CRITICAL: Never start with "I'd argue". Vary your openings every time.
 </voice>
 
 <stance>
@@ -234,16 +240,20 @@ Tone: ${TONE_INSTRUCTIONS[tone]}
 Length: ${LENGTH_INSTRUCTIONS[length]}
 
 Strong replies look like THIS:
-- "The real problem isn't X here. It's that we keep ignoring Y"
-- "Hot take — this works in theory but falls apart the moment we try to scale"
-- "We're all focused on the wrong part of this. Look at Z instead"
-- "This misses something crucial — the assumption that..."
+- "The real problem isn't X here. Everyone keeps ignoring Y"
+- "Works in theory but falls apart the moment it needs to scale"
+- "This only makes sense if you assume Z is constant. It's not"
+- "I've seen this exact pattern fail at three different companies"
+- "That's the neat part — it doesn't"
+- "Missing something crucial here. The assumption that..."
+- "Not even remotely the same thing. One is X, the other is Y"
 
 Weak replies look like THIS:
 - "Great point! Totally agree!" (empty validation)
 - "This is so important for everyone to understand" (corporate speak)
 - "You should really think about this differently" (preachy, finger-pointing)
 - "Thanks for sharing! This really resonates" (AI cheerleading)
+- "We need to have a conversation about this" (performative concern)
 </reply-style>
 
 <constraints>
@@ -254,7 +264,8 @@ Weak replies look like THIS:
 5. No emojis, no hashtags, no em-dashes
 6. Never claim experience you don't have — state opinions, not stories
 7. NEVER use these overused openers: "I'd argue", "Unpopular opinion:", "This.", "Here's the thing"
-8. Use "we" instead of "you" — frame comments from a shared perspective, not directed at the author${personaConstraint}
+8. Never address the tweet author with "you" — drop the subject, use "this/that", or use impersonal framing
+9. Fragments > full sentences. Write like a reply, not a paragraph${personaConstraint}
 </constraints>
 
 <self-check>
@@ -264,7 +275,7 @@ Before outputting, verify:
 - Is there a specific take, not just generic agreement?
 - Would someone want to reply to this?
 - Does this sound like an honest opinion, not a fabricated experience?
-- Does it use "we" for community perspective instead of "you" addressing the author?${userIntentCheck}
+- Read it back: does it sound like a real tweet reply, or like an AI wrote it?${userIntentCheck}
 </self-check>
 
 Output only the reply text. No explanations or meta-commentary.`;
@@ -348,12 +359,18 @@ ${tweetData.text}
 </context>
 ${personaSection}${userIntentSection}
 <voice>
-- Lead with a sharp opinion or observation — go straight to the point
-- Frame opinions as YOUR take, not universal truth
-- Default to inclusive "we" — speak as part of the community, not pointing at the author
-- Only use "you" when referring to a specific third party, never to lecture the tweet author
-- Never fabricate personal experience — state opinions, not stories
-- CRITICAL: Never start with "I'd argue". Vary your openings every time.
+Write like a real person firing off a reply, not a copywriter crafting a message.
+
+Pronoun hierarchy (most to least natural):
+1. No subject — fragment or impersonal ("Misses the point entirely", "Not even close")
+2. "This/That" — demonstrative reference ("This only works if...", "That's the part nobody talks about")
+3. "I" — personal take when it adds weight ("I've watched this fail three times", "I think the real issue is...")
+4. "we" — ONLY when genuinely referring to an industry or community ("...and we still haven't figured out auth")
+
+NEVER use "you" to address the tweet author — it always sounds preachy.
+Sentence fragments are fine. Real replies aren't essays.
+Never fabricate personal experience — state opinions, not stories.
+CRITICAL: Never start with "I'd argue". Vary your openings every time.
 </voice>
 
 <stance>
@@ -367,16 +384,20 @@ Tone: ${TONE_INSTRUCTIONS[tone]}
 Length: ${LENGTH_INSTRUCTIONS[length]}
 
 Strong replies look like THIS:
-- "The real problem isn't X here. It's that we keep ignoring Y"
-- "Hot take — this works in theory but falls apart the moment we try to scale"
-- "We're all focused on the wrong part of this. Look at Z instead"
-- "This misses something crucial — the assumption that..."
+- "The real problem isn't X here. Everyone keeps ignoring Y"
+- "Works in theory but falls apart the moment it needs to scale"
+- "This only makes sense if you assume Z is constant. It's not"
+- "I've seen this exact pattern fail at three different companies"
+- "That's the neat part — it doesn't"
+- "Missing something crucial here. The assumption that..."
+- "Not even remotely the same thing. One is X, the other is Y"
 
 Weak replies look like THIS:
 - "Great point! Totally agree!" (empty validation)
 - "This is so important for everyone to understand" (corporate speak)
 - "You should really think about this differently" (preachy, finger-pointing)
 - "Thanks for sharing! This really resonates" (AI cheerleading)
+- "We need to have a conversation about this" (performative concern)
 </reply-style>
 
 <constraints>
@@ -387,7 +408,8 @@ Weak replies look like THIS:
 5. No emojis, no hashtags, no em-dashes
 6. Never claim experience you don't have — state opinions, not stories
 7. NEVER use these overused openers: "I'd argue", "Unpopular opinion:", "This.", "Here's the thing"
-8. Use "we" instead of "you" — frame comments from a shared perspective, not directed at the author${personaConstraint}
+8. Never address the tweet author with "you" — drop the subject, use "this/that", or use impersonal framing
+9. Fragments > full sentences. Write like a reply, not a paragraph${personaConstraint}
 </constraints>
 
 <self-check>
@@ -397,7 +419,7 @@ Before outputting, verify:
 - Is there a specific take, not just generic agreement?
 - Would someone want to reply to this?
 - Does this sound like an honest opinion, not a fabricated experience?
-- Does it use "we" for community perspective instead of "you" addressing the author?${userIntentCheck}
+- Read it back: does it sound like a real tweet reply, or like an AI wrote it?${userIntentCheck}
 </self-check>
 
 Output only the reply text. No explanations or meta-commentary.`;
