@@ -30,20 +30,18 @@ Object.defineProperty(globalThis, 'chrome', {
   configurable: true,
 });
 
+function resetStorageMock(mock: ReturnType<typeof createChromeStorageMock>): void {
+  mock._reset();
+  mock.get.mockClear();
+  mock.set.mockClear();
+  mock.remove.mockClear();
+  mock.clear.mockClear();
+}
+
 // Reset all mocks and in-memory stores between tests
 beforeEach(() => {
-  localMock._reset();
-  localMock.get.mockClear();
-  localMock.set.mockClear();
-  localMock.remove.mockClear();
-  localMock.clear.mockClear();
-
-  sessionMock._reset();
-  sessionMock.get.mockClear();
-  sessionMock.set.mockClear();
-  sessionMock.remove.mockClear();
-  sessionMock.clear.mockClear();
-
+  resetStorageMock(localMock);
+  resetStorageMock(sessionMock);
   (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockClear();
   (chrome.runtime.onMessage.addListener as ReturnType<typeof vi.fn>).mockClear();
 });
