@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { TweetData, CommentTone, CommentLength, CommentStance, MessagePayload, TokenUsage, TokenCost, PersonaData, GeminiModel, TranslationCacheEntry, CommentExplanation, SidePanelState } from '../types';
+import { TweetData, CommentTone, CommentLength, CommentStance, MessagePayload, TokenUsage, TokenCost, PersonaData, GeminiModel, TranslationCacheEntry, CommentExplanation, SidePanelState, TweetResults } from '../types';
 import { storage, sessionStorage } from '../utils/storage';
 import { generateCommentStream, DEFAULT_MODEL, AVAILABLE_MODELS, isKoreanText, translateTweet, generateCommentExplanation } from '../utils/gemini';
 import { analyzeWritings, savePersona, loadPersona, saveRawWritings, clearPersona } from '../utils/persona';
@@ -63,6 +63,79 @@ function App() {
   const [explanationError, setExplanationError] = useState<string>('');
   const [explanationTokenUsage, setExplanationTokenUsage] = useState<TokenUsage | null>(null);
   const [explanationTokenCost, setExplanationTokenCost] = useState<TokenCost | null>(null);
+
+  // Tweet text expansion
+  const [isTweetExpanded, setIsTweetExpanded] = useState(false);
+
+  // Helper: cache key from tweet text (first 200 chars)
+  const getTweetKey = (tweet: TweetData) => tweet.text.slice(0, 200);
+
+  // Save current results to per-tweet cache
+  const saveTweetResults = async (tweet: TweetData, overrides?: Partial<TweetResults>) => {
+    const key = getTweetKey(tweet);
+    const results: TweetResults = {
+      generatedComment,
+      tokenUsage,
+      tokenCost,
+      currentModel,
+      commentExplanation,
+      lastUpdated: Date.now(),
+      ...overrides,
+    };
+    // Only cache if there's something worth saving
+    if (!results.generatedComment) return;
+    try {
+      const existing = await sessionStorage.get('tweetResultsCache') || {};
+      const keys = Object.keys(existing);
+      // Limit cache to 10 entries, remove oldest
+      if (keys.length >= 10 && !existing[key]) {
+        let oldestKey = keys[0];
+        let oldestTime = existing[keys[0]].lastUpdated;
+        for (const k of keys) {
+          if (existing[k].lastUpdated < oldestTime) {
+            oldestKey = k;
+            oldestTime = existing[k].lastUpdated;
+          }
+        }
+        delete existing[oldestKey];
+      }
+      existing[key] = results;
+      await sessionStorage.set('tweetResultsCache', existing);
+    } catch {
+      // Silently fail
+    }
+  };
+
+  // Load cached results for a tweet
+  const loadTweetResults = async (tweet: TweetData): Promise<TweetResults | null> => {
+    try {
+      const cache = await sessionStorage.get('tweetResultsCache');
+      if (!cache) return null;
+      return cache[getTweetKey(tweet)] || null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Apply cached results to state
+  const restoreTweetResults = (results: TweetResults) => {
+    setGeneratedComment(results.generatedComment);
+    setTokenUsage(results.tokenUsage);
+    setTokenCost(results.tokenCost);
+    setCurrentModel(results.currentModel);
+    setCommentExplanation(results.commentExplanation);
+  };
+
+  // Clear generated state
+  const clearGeneratedState = () => {
+    setGeneratedComment('');
+    setTokenUsage(null);
+    setTokenCost(null);
+    setCommentExplanation(null);
+    setExplanationError('');
+    setExplanationTokenUsage(null);
+    setExplanationTokenCost(null);
+  };
 
   // Save sidepanel state to session storage
   const saveSidePanelState = async (overrides?: Partial<SidePanelState>) => {
@@ -139,20 +212,37 @@ function App() {
         console.log('📨 Sidepanel: Received cached data response:', response);
         if (response?.data) {
           const newTweet = response.data as TweetData;
+          setTweetData(newTweet);
 
-          // Compare with saved state - if same tweet, keep generated results
+          // Check per-tweet cache for previously generated results
+          try {
+            const cache = await sessionStorage.get('tweetResultsCache');
+            const key = newTweet.text.slice(0, 200);
+            const cachedResults = cache?.[key];
+            if (cachedResults?.generatedComment) {
+              console.log('🔄 Restoring cached results for current tweet');
+              setGeneratedComment(cachedResults.generatedComment);
+              setTokenUsage(cachedResults.tokenUsage);
+              setTokenCost(cachedResults.tokenCost);
+              setCurrentModel(cachedResults.currentModel);
+              setCommentExplanation(cachedResults.commentExplanation);
+              return;
+            }
+          } catch {
+            // Fall through
+          }
+
+          // Fall back to sidePanelState
           try {
             const savedState = await sessionStorage.get('sidePanelState');
             if (savedState?.tweetData?.text === newTweet.text && savedState.generatedComment) {
               console.log('✅ Same tweet detected, preserving generated results');
-              setTweetData(newTweet);
               return;
             }
           } catch {
-            // Fall through to set new tweet
+            // No state to restore
           }
 
-          setTweetData(newTweet);
           console.log('✅ Sidepanel: Loaded cached tweet data');
         }
       })
@@ -173,9 +263,40 @@ function App() {
       console.log('📨 Sidepanel received message:', message, 'from', sender);
 
       if (message.type === 'TWEET_CLICKED' && message.data) {
-        console.log('✅ Processing TWEET_CLICKED message with data:', message.data);
-        setTweetData(message.data as TweetData);
-        setGeneratedComment('');
+        const newTweet = message.data as TweetData;
+        console.log('✅ Processing TWEET_CLICKED message with data:', newTweet);
+
+        // Save current results to cache before switching
+        // (uses refs to avoid stale closure - we read from session storage)
+        (async () => {
+          try {
+            const savedState = await sessionStorage.get('sidePanelState');
+            if (savedState?.tweetData && savedState.generatedComment) {
+              await saveTweetResults(savedState.tweetData, {
+                generatedComment: savedState.generatedComment,
+                tokenUsage: savedState.tokenUsage,
+                tokenCost: savedState.tokenCost,
+                currentModel: savedState.currentModel,
+                commentExplanation: savedState.commentExplanation,
+                lastUpdated: Date.now(),
+              });
+            }
+          } catch {
+            // Silently fail
+          }
+
+          // Check if the new tweet has cached results
+          const cachedResults = await loadTweetResults(newTweet);
+          if (cachedResults) {
+            console.log('🔄 Restoring cached results for tweet');
+            restoreTweetResults(cachedResults);
+          } else {
+            clearGeneratedState();
+          }
+        })();
+
+        setTweetData(newTweet);
+        setIsTweetExpanded(false);
         setError('');
         setSuccess('');
         // Clear translation state for new tweet
@@ -184,11 +305,6 @@ function App() {
         setTranslationError('');
         setTranslationTokenUsage(null);
         setTranslationTokenCost(null);
-        // Clear explanation state for new tweet
-        setCommentExplanation(null);
-        setExplanationError('');
-        setExplanationTokenUsage(null);
-        setExplanationTokenCost(null);
         sendResponse({ received: true });
       }
 
@@ -287,6 +403,18 @@ function App() {
       await saveSidePanelState({
         commentExplanation: result.explanation,
       });
+
+      // Update per-tweet cache with explanation
+      if (tweet) {
+        await saveTweetResults(tweet, {
+          generatedComment: generatedComment || '',
+          tokenUsage,
+          tokenCost,
+          currentModel,
+          commentExplanation: result.explanation,
+          lastUpdated: Date.now(),
+        });
+      }
     } catch (err) {
       console.error('❌ Explanation failed:', err);
       setExplanationError(err instanceof Error ? err.message : 'Explanation failed');
@@ -344,6 +472,16 @@ function App() {
         tokenUsage: result.usage,
         tokenCost: result.cost,
         currentModel: result.model,
+      });
+
+      // Save to per-tweet cache
+      await saveTweetResults(tweetData, {
+        generatedComment: result.comment,
+        tokenUsage: result.usage,
+        tokenCost: result.cost,
+        currentModel: result.model,
+        commentExplanation: null,
+        lastUpdated: Date.now(),
       });
 
       // Auto-generate explanation
@@ -457,7 +595,13 @@ function App() {
           {tweetData.author && (
             <div className="tweet-author">{tweetData.author}</div>
           )}
-          <div className="tweet-content">{tweetData.text}</div>
+          <div
+            className={`tweet-content ${!isTweetExpanded ? 'tweet-content--truncated' : ''}`}
+            onClick={() => setIsTweetExpanded(!isTweetExpanded)}
+            title={isTweetExpanded ? 'Click to collapse' : 'Click to expand'}
+          >
+            {tweetData.text}
+          </div>
 
           {/* Translate Button - only show for non-Korean tweets */}
           {!isKoreanText(tweetData.text) && !translation && !isTranslating && !translationError && (
