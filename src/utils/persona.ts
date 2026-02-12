@@ -58,6 +58,10 @@ Return a JSON object with this structure:
     "humor": true|false (presence of jokes, wit, or playful language),
     "directness": "direct|indirect" (gets to point vs builds up context)
   },
+  "opinionStyle": {
+    "hookPattern": "question|bold-claim|reframe|observation" (how they open an opinion — do they ask a provocative question, make a bold claim, reframe the issue, or start with an observation?),
+    "argumentStyle": "evidence|analogy|reframe|direct-assertion" (how they back up their take — with data/evidence, analogies, reframing the problem, or just asserting directly?)
+  },
   "commonPhrases": ["..."] (5-10 signature expressions, transitions, or verbal tics),
   "topics": ["..."] (3-7 recurring themes or subject areas),
   "exampleResponses": ["..."] (3-5 short replies in this person's authentic voice)
@@ -92,6 +96,12 @@ Return a JSON object with this structure:
         humor: parsed.writingStyle?.humor || false,
         directness: parsed.writingStyle?.directness || 'direct',
       },
+      ...(parsed.opinionStyle && {
+        opinionStyle: {
+          hookPattern: parsed.opinionStyle.hookPattern || 'bold-claim',
+          argumentStyle: parsed.opinionStyle.argumentStyle || 'direct-assertion',
+        },
+      }),
       commonPhrases: parsed.commonPhrases || [],
       topics: parsed.topics || [],
       exampleResponses: parsed.exampleResponses || [],
