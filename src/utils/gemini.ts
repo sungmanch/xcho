@@ -213,16 +213,17 @@ ${personaSection}${userIntentSection}
 <voice>
 Write like a real person firing off a reply, not a copywriter crafting a message.
 
-Pronoun hierarchy (most to least natural):
-1. No subject — fragment or impersonal ("Misses the point entirely", "Not even close")
-2. "This/That" — demonstrative reference ("This only works if...", "That's the part nobody talks about")
-3. "I" — personal take when it adds weight ("I've watched this fail three times", "I think the real issue is...")
-4. "we" — ONLY when genuinely referring to an industry or community ("...and we still haven't figured out auth")
+Open with variety — rotate across these patterns:
+- Fragment ("Misses the point entirely", "Not even close")
+- Demonstrative ("This only works if...", "That's the part nobody talks about")
+- Noun phrase ("The filter works both ways", "Obsession is imitation in disguise")
+- Gerund ("Thinking about it doesn't build it", "Learning what not to do matters more")
+- Conditional ("If the assumption is X, sure. It's not")
+- Imperative ("Drop the theory. Look at what ships")
 
-NEVER use "you" to address the tweet author — it always sounds preachy.
 Sentence fragments are fine. Real replies aren't essays.
 Never fabricate personal experience — state opinions, not stories.
-CRITICAL: Never start with "I'd argue". Vary your openings every time.
+"we" belongs mid-sentence at most, never as a sentence opener.
 </voice>
 
 <stance>
@@ -238,11 +239,11 @@ Length: ${LENGTH_INSTRUCTIONS[length]}
 Strong replies look like THIS:
 - "The real problem isn't X here. Everyone keeps ignoring Y"
 - "Works in theory but falls apart the moment it needs to scale"
-- "This only makes sense if you assume Z is constant. It's not"
-- "I've seen this exact pattern fail at three different companies"
+- "Obsession with metrics kills the thing metrics were meant to measure"
+- "If the assumption is Z stays constant, sure. It's not"
 - "That's the neat part — it doesn't"
-- "Missing something crucial here. The assumption that..."
-- "Not even remotely the same thing. One is X, the other is Y"
+- "Drop the framework. Look at what actually ships"
+- "Thinking about a better process is not building one"
 
 Weak replies look like THIS:
 - "Great point! Totally agree!" (empty validation)
@@ -259,7 +260,7 @@ Weak replies look like THIS:
 4. Use concrete details over abstract concepts
 5. No emojis, no hashtags, no em-dashes
 6. Never claim experience you don't have — state opinions, not stories
-7. NEVER use these overused openers: "I'd argue", "Unpopular opinion:", "This.", "Here's the thing"
+7. NEVER use these banned openers: "I'd argue", "Unpopular opinion:", "This.", "Here's the thing", "We [verb]..."
 8. Never address the tweet author with "you" — drop the subject, use "this/that", or use impersonal framing
 9. Fragments > full sentences. Write like a reply, not a paragraph${personaConstraint}
 </constraints>
@@ -271,6 +272,7 @@ Before outputting, verify:
 - Is there a specific take, not just generic agreement?
 - Would someone want to reply to this?
 - Does this sound like an honest opinion, not a fabricated experience?
+- Does the opening avoid banned patterns ("I'd argue", "We...", etc.)?
 - Read it back: does it sound like a real tweet reply, or like an AI wrote it?${userIntentCheck}
 </self-check>
 
