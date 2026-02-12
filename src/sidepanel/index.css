@@ -442,6 +442,15 @@ body {
   color: var(--color-text-primary);
   border-left: 3px solid var(--color-accent);
   position: relative;
+  cursor: pointer;
+  transition: max-height 0.2s ease;
+}
+
+.tweet-content--truncated {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .tweet-content::before {
